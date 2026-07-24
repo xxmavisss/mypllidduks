@@ -671,47 +671,14 @@ html, body {
 .rhythm-poster .poster-sub { font-size: 11px; color: rgba(255,255,255,0.75); margin-bottom: 14px; }
 .rhythm-poster .poster-vinyl {
   width: 130px; height: 130px; border-radius: 50%; margin: 0 auto 14px;
-  background: #111;
-  border: 3px solid var(--gold-accent); 
   position: relative;
-  overflow: hidden;
   box-shadow: 0 8px 20px rgba(0,0,0,0.6);
   animation: vinylSpin 4s linear infinite;
   transform: translateZ(0);
 }
-.rhythm-poster .poster-vinyl::before {
-  /* 🌟 同心圆图案本身是完全对称的，就算真的在转，肉眼也看不出来——
-     加一条不对称的细高光线，转动时才能被看见 */
-  content: ''; position: absolute; top: 0; left: 50%; width: 2px; height: 50%;
-  background: rgba(255,255,255,0.35); transform-origin: bottom center; z-index: 3;
-}
-
-.rhythm-poster .poster-vinyl .vinyl-grooves {
-  position: absolute; inset: 6px; border-radius: 50%;
-  background: repeating-radial-gradient(
-    circle at center,
-    #111,
-    #111 3px,
-    #222 4px,
-    #111 5px
-  );
-  opacity: 0.8;
-}
-
-.rhythm-poster .poster-vinyl .vinyl-center {
-  position: absolute; inset: 0; margin: auto; width: 42px; height: 42px;
-  border-radius: 50%; 
-  background: linear-gradient(135deg, var(--gold-bright), var(--gold-accent));
-  box-shadow: 0 0 0 3px #1a1008;
-}
-
-.rhythm-poster .poster-vinyl .vinyl-center::after {
-  content: ''; position: absolute; inset: 0; margin: auto; width: 8px; height: 8px;
-  border-radius: 50%; background: #000;
-}
 .rhythm-poster .poster-vinyl .vinyl-photo {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; border-radius: 50%; z-index: 2;
+  object-fit: cover; border-radius: 50%;
 }
 
 @keyframes vinylSpin { 
@@ -973,8 +940,6 @@ html, body {
         <h4>DEEP SEA CHIEF MUSICIAN</h4>
         <div class="poster-sub">ASTERUM CRUISE · Rhythm Ocean Beat</div>
         <div class="poster-vinyl" id="posterVinyl">
-          <div class="vinyl-grooves"></div>
-          <div class="vinyl-center"></div>
           <img src="./vinyl.png" class="vinyl-photo" alt="Vinyl" onerror="this.remove();" />
         </div>
         <div class="poster-name" id="posterName">PLLI</div>
