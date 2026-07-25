@@ -519,7 +519,13 @@ html, body {
 .ticket {
   display: flex; background: var(--paper-cream); color: var(--text-dark);
   border-radius: 14px; overflow: hidden; box-shadow: 0 12px 30px rgba(0,0,0,0.3);
+  position: relative; border: 2px solid var(--gold-accent);
 }
+.ticket::before, .ticket::after {
+  content: '✦'; position: absolute; color: var(--gold-accent); font-size: 12px; z-index: 3;
+}
+.ticket::before { top: 6px; left: 6px; }
+.ticket::after { bottom: 6px; right: 6px; }
 .ticket-main { flex: 1; padding: 18px; position: relative; }
 .ticket-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #D5C7B1; padding-bottom: 8px; }
 .ticket-brand { font-family: 'Cinzel'; font-weight: 700; font-size: 14px; color: var(--ocean-teal); }
@@ -709,8 +715,14 @@ html, body {
   width: 100%; max-width: 320px; margin: 16px auto 0; border-radius: 16px; overflow: hidden;
   background: linear-gradient(160deg, #0A192F, #16344B 60%, #0A192F);
   border: 1px solid rgba(226,185,111,0.4); padding: 26px 18px; text-align: center;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 0 6px rgba(226,185,111,0.12);
+  position: relative;
 }
+.rhythm-poster::before, .rhythm-poster::after {
+  content: '✦'; position: absolute; color: var(--gold-bright); font-size: 12px; opacity: 0.85; z-index: 3;
+}
+.rhythm-poster::before { top: 10px; left: 10px; }
+.rhythm-poster::after { bottom: 10px; right: 10px; }
 .rhythm-poster .poster-badge { font-size: 34px; }
 .rhythm-poster h4 {
   font-family: 'Cinzel', serif; color: var(--gold-bright); font-size: 16px; margin: 10px 0 4px;
@@ -1014,8 +1026,7 @@ html, body {
 
       <div style="display: flex; gap: 10px; margin-top: 16px;">
         <button class="btn btn-outline" id="rhythmRetryBtn" style="flex:1;">🔄 Play Again</button>
-        <button class="btn btn-primary" id="rhythmDownloadBtn" style="flex:1; display:none;">📥 Save Poster</button>
-        <button class="btn btn-outline" id="sharePosterBtn" style="flex:1; display:none;">📤 Share</button>
+        <button class="btn btn-primary" id="sharePosterBtn" style="flex:1; display:none;">📤 Share Poster</button>
       </div>
     </div>
 
@@ -1093,10 +1104,7 @@ html, body {
       ⚠️ NOTICE: This boarding pass is a souvenir for PLLI. Official CSE venue entry requires showing your Gmail confirmation email and Reservation Name or Social Media ID.
     </div>
 
-    <div style="display:flex; gap:10px;">
-      <button class="btn btn-coral" id="downloadBtn" style="flex:1;">Save / Download Ticket</button>
-      <button class="btn btn-outline" id="shareTicketBtn" style="flex:1;">📤 Share</button>
-    </div>
+    <button class="btn btn-coral" id="shareTicketBtn" style="width:100%;">📤 Share Ticket</button>
 
     <div class="social-row">
       <a class="btn btn-outline" href="https://x.com/MYPlliDduks" target="_blank">Twitter / X</a>
@@ -1207,12 +1215,21 @@ window.shareCanvasImage = function (canvas, filename, shareText) {
           resolve(true);
           return;
         } catch (err) {
-          // 用户取消分享，不算错误，直接结束
-          resolve(true);
-          return;
+          // 🐛 修复：canvas.toBlob 是异步的，等这个回调真正跑起来时，
+          // 触发分享所需要的"用户手势"授权窗口很可能已经过期了，
+          // 这时 navigator.share() 会直接抛错——不是用户手动点了取消。
+          // 之前不管什么错误都当成"用户取消"直接结束，
+          // 结果桌面浏览器分享失败时，图片既没跳分享面板、也没有退回下载，就这样凭空消失了。
+          // 现在只有 AbortError（用户真的手动点了取消）才什么都不做，
+          // 其他任何错误都乖乖退回下载，保证图片一定会到用户手上。
+          if (err && err.name === 'AbortError') {
+            resolve(true);
+            return;
+          }
+          // 不是用户取消，往下走，退回下载
         }
       }
-      // 🌟 不支持系统分享面板（常见于桌面浏览器）：先帮忙下载图片，再提示手动分享
+      // 🌟 不支持系统分享面板（常见于桌面浏览器）或分享失败：先帮忙下载图片，再提示手动分享
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.download = filename;
@@ -1485,41 +1502,6 @@ if (genBtn) {
   });
 }
 
-const downloadBtn = document.getElementById('downloadBtn');
-if (downloadBtn) {
-  const originalBtnText = downloadBtn.textContent;
-  downloadBtn.addEventListener('click', async () => {
-    const card = document.getElementById('ticketCard');
-    if (!card) return;
-
-    if (typeof html2canvas === 'undefined') {
-      (window.showToast || alert)('Image generator failed to load. Please check your network, refresh the page, and try again.');
-      return;
-    }
-
-    downloadBtn.disabled = true;
-    downloadBtn.style.opacity = '0.6';
-    downloadBtn.textContent = 'Generating... ⏳';
-
-    try {
-      const canvas = await html2canvas(card, {
-        scale: 2, backgroundColor: '#FAF4E8', useCORS: true, logging: false, imageTimeout: 8000
-      });
-      const a = document.createElement('a');
-      a.download = `Whisper_from_the_Deep_Blue_Ticket.png`;
-      a.href = canvas.toDataURL('image/png');
-      a.click();
-    } catch (err) {
-      console.error('Ticket download failed:', err);
-      (window.showToast || alert)('Download failed. Please check the image path!');
-    } finally {
-      downloadBtn.disabled = false;
-      downloadBtn.style.opacity = '1';
-      downloadBtn.textContent = originalBtnText;
-    }
-  });
-}
-
 const shareTicketBtn = document.getElementById('shareTicketBtn');
 if (shareTicketBtn) {
   const originalShareText = shareTicketBtn.textContent;
@@ -1622,7 +1604,6 @@ window.switchView = function(targetView) {
   const maxComboEl = document.getElementById('rhythmMaxCombo');
   const posterEl = document.getElementById('rhythmPoster');
   const posterNameEl = document.getElementById('posterName');
-  const downloadPosterBtn = document.getElementById('rhythmDownloadBtn');
   const sharePosterBtn = document.getElementById('sharePosterBtn');
 
   if (!stageEl) return; 
@@ -1982,11 +1963,9 @@ window.switchView = function(targetView) {
       }
 
       posterEl.style.display = 'block';
-      downloadPosterBtn.style.display = 'inline-flex';
       if (sharePosterBtn) sharePosterBtn.style.display = 'inline-flex';
     } else {
       posterEl.style.display = 'none';
-      downloadPosterBtn.style.display = 'none';
       if (sharePosterBtn) sharePosterBtn.style.display = 'none';
     }
 
@@ -2115,33 +2094,6 @@ window.switchView = function(targetView) {
     }, { passive: false });
     btn.addEventListener('click', () => judgeHit(Number(btn.dataset.lane)));
   });
-
-  if (downloadPosterBtn) {
-    const originalText = downloadPosterBtn.textContent;
-    downloadPosterBtn.addEventListener('click', async () => {
-      if (typeof html2canvas === 'undefined') {
-        (window.showToast || alert)('Image generator failed to load. Please check your network, refresh the page, and try again.');
-        return;
-      }
-      downloadPosterBtn.disabled = true;
-      downloadPosterBtn.style.opacity = '0.6';
-      downloadPosterBtn.textContent = 'Generating... ⏳';
-      try {
-        const canvas = await html2canvas(posterEl, { scale: 2, useCORS: true, logging: false });
-        const a = document.createElement('a');
-        a.download = 'Deep_Sea_Chief_Musician.png';
-        a.href = canvas.toDataURL('image/png');
-        a.click();
-      } catch (err) {
-        console.error('Poster download failed:', err);
-        (window.showToast || alert)('Download failed. Please check the image path!');
-      } finally {
-        downloadPosterBtn.disabled = false;
-        downloadPosterBtn.style.opacity = '1';
-        downloadPosterBtn.textContent = originalText;
-      }
-    });
-  }
 
   if (sharePosterBtn) {
     const originalShareText = sharePosterBtn.textContent;
