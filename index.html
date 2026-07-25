@@ -120,7 +120,16 @@
     messageOcean.innerHTML = '';
 
     const data = snapshot.val();
-    if (!data) { occupiedPositions = []; return; }
+    const msgCountEl = document.getElementById('msgCount');
+    if (!data) {
+      occupiedPositions = [];
+      if (msgCountEl) msgCountEl.textContent = '🌊 Be the first to leave a blessing!';
+      return;
+    }
+    if (msgCountEl) {
+      const total = Object.keys(data).length;
+      msgCountEl.textContent = `🌊 ${total} blessing${total === 1 ? '' : 's'} released so far`;
+    }
 
     const usedPositions = []; // 本轮渲染中已分配出去的坐标，避免彼此叠加
 
@@ -285,6 +294,10 @@ html, body {
   pointer-events: none; cursor: default;
 }
 .subtitle { font-size: 12px; color: rgba(255,255,255,0.85); font-weight: 300; }
+.msg-count {
+  font-size: 12px; color: var(--gold-bright); margin-top: 8px; font-weight: 600;
+  letter-spacing: 0.5px;
+}
 
 /* ⏳ 倒计时牌样式 */
 .timer-container {
@@ -862,6 +875,7 @@ html, body {
     </button>
     <h2 class="title" style="font-size: 28px; margin: 0;">Ocean of Blessings</h2>
     <div class="subtitle" id="msgSubtitle">Choose your ocean companion and send your wishes into the deep blue.💙</div>
+    <div class="msg-count" id="msgCount">🌊 Loading blessings...</div>
 
     <div class="message-form-card" id="msgFormCard">
       <button class="form-close-btn" onclick="toggleMsgForm('hide')">✕</button>
