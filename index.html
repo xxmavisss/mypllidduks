@@ -109,7 +109,7 @@
       
     }).catch((err) => {
       console.error(err);
-      (window.showToast || alert)('发送失败，请检查网络或 Firebase 配置！');
+      (window.showToast || alert)('Failed to send. Please check your network or Firebase configuration!');
     });
   };
 
@@ -1219,7 +1219,7 @@ window.shareCanvasImage = function (canvas, filename, shareText) {
       a.href = url;
       a.click();
       URL.revokeObjectURL(url);
-      (window.showToast || alert)('这台设备不支持直接跳转分享，已经帮你保存图片，去 IG/Twitter 手动分享吧！📸');
+      (window.showToast || alert)('Direct sharing is not supported on this device. The image has been saved for you — please share it manually on IG/Twitter! 📸');
       resolve(false);
     }, 'image/png');
   });
@@ -1373,7 +1373,7 @@ if (bgmRow) {
         bgmRow.classList.add('playing');
         if (bgmSub) bgmSub.textContent = "Playing...";
       }).catch(err => {
-        (window.showToast || alert)("提示：未找到音频文件 yejuncoverbgm.mp3！");
+        (window.showToast || alert)("Notice: audio file yejuncoverbgm.mp3 was not found!");
       });
     } else {
       bgmAudio.pause();
@@ -1493,7 +1493,7 @@ if (downloadBtn) {
     if (!card) return;
 
     if (typeof html2canvas === 'undefined') {
-      (window.showToast || alert)('图片生成组件加载失败，请检查网络后重新整理页面再试一次。');
+      (window.showToast || alert)('Image generator failed to load. Please check your network, refresh the page, and try again.');
       return;
     }
 
@@ -1511,7 +1511,7 @@ if (downloadBtn) {
       a.click();
     } catch (err) {
       console.error('Ticket download failed:', err);
-      (window.showToast || alert)('下载失败，请检查图片路径！');
+      (window.showToast || alert)('Download failed. Please check the image path!');
     } finally {
       downloadBtn.disabled = false;
       downloadBtn.style.opacity = '1';
@@ -1527,7 +1527,7 @@ if (shareTicketBtn) {
     const card = document.getElementById('ticketCard');
     if (!card) return;
     if (typeof html2canvas === 'undefined') {
-      (window.showToast || alert)('图片生成组件加载失败，请检查网络后重新整理页面再试一次。');
+      (window.showToast || alert)('Image generator failed to load. Please check your network, refresh the page, and try again.');
       return;
     }
     shareTicketBtn.disabled = true;
@@ -1540,7 +1540,7 @@ if (shareTicketBtn) {
       await window.shareCanvasImage(canvas, 'Whisper_from_the_Deep_Blue_Ticket.png', "Yejun's birthday boarding pass 🎫🌊");
     } catch (err) {
       console.error('Ticket share failed:', err);
-      (window.showToast || alert)('分享失败，请检查图片路径！');
+      (window.showToast || alert)('Share failed. Please check the image path!');
     } finally {
       shareTicketBtn.disabled = false;
       shareTicketBtn.style.opacity = '1';
@@ -1925,7 +1925,7 @@ window.switchView = function(targetView) {
     try {
       await rhythmAudio.play();
     } catch (err) {
-      (window.showToast || alert)('音频播放失败，请检查网络或音频文件！');
+      (window.showToast || alert)('Audio playback failed. Please check your network or the audio file!');
       gameActive = false;
       playAreaEl.style.display = 'none';
       introEl.style.display = 'block';
@@ -2044,11 +2044,26 @@ window.switchView = function(targetView) {
     return newScore > scores[4];
   }
 
-  if (window.__fb) {
-    window.__fb.onValue(window.__fb.leaderboardRef, (snap) => {
-      latestLeaderboard = snap.val();
-      renderLeaderboard(latestLeaderboard);
-    });
+  // 🐛 修复：Firebase 是在另一个 type="module" 的 <script> 里初始化的，
+  // module 脚本是延迟执行的，会晚于这段 classic <script>，
+  // 所以下面这行如果直接检查 window.__fb，此时它还是 undefined，
+  // onValue 订阅从来没有真正建立起来——这就是排行榜提交后网页不会更新的原因。
+  // 改成等 DOMContentLoaded（此时两个 <script> 都保证执行完了）再订阅。
+  function initLeaderboardSubscription() {
+    if (window.__fb) {
+      window.__fb.onValue(window.__fb.leaderboardRef, (snap) => {
+        latestLeaderboard = snap.val();
+        renderLeaderboard(latestLeaderboard);
+      });
+    } else {
+      // 万一 DOMContentLoaded 触发时 module 脚本还没跑完，稍等一下再试
+      setTimeout(initLeaderboardSubscription, 100);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initLeaderboardSubscription);
+  } else {
+    initLeaderboardSubscription();
   }
 
   if (lbBtn) {
@@ -2074,12 +2089,12 @@ window.switchView = function(targetView) {
         name,
         timestamp: Date.now()
       }).then(() => {
-        (window.showToast || alert)('🏆 已经上榜啦！');
+        (window.showToast || alert)('🏆 You made the leaderboard!');
         const hsPrompt = document.getElementById('hsPrompt');
         if (hsPrompt) hsPrompt.style.display = 'none';
         pendingHighScore = null;
       }).catch(() => {
-        (window.showToast || alert)('上传排行榜失败，请检查网络！');
+        (window.showToast || alert)('Failed to upload to the leaderboard. Please check your network!');
       }).finally(() => {
         hsSubmitBtn.disabled = false;
       });
@@ -2105,7 +2120,7 @@ window.switchView = function(targetView) {
     const originalText = downloadPosterBtn.textContent;
     downloadPosterBtn.addEventListener('click', async () => {
       if (typeof html2canvas === 'undefined') {
-        (window.showToast || alert)('图片生成组件加载失败，请检查网络后重新整理页面再试一次。');
+        (window.showToast || alert)('Image generator failed to load. Please check your network, refresh the page, and try again.');
         return;
       }
       downloadPosterBtn.disabled = true;
@@ -2119,7 +2134,7 @@ window.switchView = function(targetView) {
         a.click();
       } catch (err) {
         console.error('Poster download failed:', err);
-        (window.showToast || alert)('下载失败，请检查图片路径！');
+        (window.showToast || alert)('Download failed. Please check the image path!');
       } finally {
         downloadPosterBtn.disabled = false;
         downloadPosterBtn.style.opacity = '1';
@@ -2132,7 +2147,7 @@ window.switchView = function(targetView) {
     const originalShareText = sharePosterBtn.textContent;
     sharePosterBtn.addEventListener('click', async () => {
       if (typeof html2canvas === 'undefined') {
-        (window.showToast || alert)('图片生成组件加载失败，请检查网络后重新整理页面再试一次。');
+        (window.showToast || alert)('Image generator failed to load. Please check your network, refresh the page, and try again.');
         return;
       }
       sharePosterBtn.disabled = true;
@@ -2143,7 +2158,7 @@ window.switchView = function(targetView) {
         await window.shareCanvasImage(canvas, 'Deep_Sea_Chief_Musician.png', 'I hit S rank on Rhythm Ocean Beat! 🎻🌊');
       } catch (err) {
         console.error('Poster share failed:', err);
-        (window.showToast || alert)('分享失败，请检查图片路径！');
+        (window.showToast || alert)('Share failed. Please check the image path!');
       } finally {
         sharePosterBtn.disabled = false;
         sharePosterBtn.style.opacity = '1';
