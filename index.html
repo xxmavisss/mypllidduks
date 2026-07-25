@@ -32,6 +32,9 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
   const messagesRef = ref(db, 'messages');
+  const leaderboardRef = ref(db, 'leaderboard');
+  // 🌟 暴露给下面的节奏游戏引擎（不同的 <script>，用同一个 Firebase 项目存排行榜）
+  window.__fb = { db, ref, push, onValue, leaderboardRef };
 
   // 🌊 生成围绕四周（避开中间留言表单区）的随机坐标，并尽量避开已经存在的其他留言图标（防止叠在一起难点）
   let occupiedPositions = []; // 目前海面上所有留言图标的坐标，供下一次生成新坐标时参考避开
@@ -596,6 +599,25 @@ html, body {
 .rhythm-song-option .song-title { font-size: 13px; font-weight: 600; color: #fff; }
 .rhythm-song-option .song-sub { font-size: 10.5px; color: rgba(255,255,255,0.55); }
 
+.rhythm-leaderboard {
+  margin-top: 12px; padding: 14px; border-radius: 14px;
+  background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.15); text-align: left;
+}
+.rhythm-leaderboard .lb-title {
+  font-family: 'Cinzel', serif; color: var(--gold-bright); font-size: 13px;
+  text-align: center; margin-bottom: 10px; letter-spacing: 1px;
+}
+.lb-entry {
+  display: flex; align-items: center; gap: 8px; padding: 6px 4px; font-size: 12px; color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.lb-entry:last-child { border-bottom: none; }
+.lb-entry .lb-rank { width: 20px; font-weight: 700; color: var(--gold-bright); }
+.lb-entry .lb-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-entry .lb-score { font-weight: 700; }
+.lb-empty { font-size: 12px; color: rgba(255,255,255,0.6); text-align: center; padding: 6px 0; }
+
+
 .rhythm-hud {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 10px; font-size: 12px; color: #fff;
@@ -675,9 +697,12 @@ html, body {
   box-shadow: 0 8px 20px rgba(0,0,0,0.6);
   animation: vinylSpin 4s linear infinite;
   transform: translateZ(0);
+  overflow: hidden; /* 配合下面放大裁切，把图片自带的边框裁掉 */
 }
 .rhythm-poster .poster-vinyl .vinyl-photo {
-  position: absolute; inset: 0; width: 100%; height: 100%;
+  position: absolute; top: 50%; left: 50%;
+  width: 128%; height: 128%; /* 比圆框大一圈，裁掉原图周围的边框/背景 */
+  transform: translate(-50%, -50%);
   object-fit: cover; border-radius: 50%;
 }
 
@@ -901,6 +926,12 @@ html, body {
 
       <p style="font-size:11px; opacity:0.65; margin-top:10px;">⚠️ Notes are auto-generated from the song's beat — timing may not be frame-perfect, but it's fun to try! 😉</p>
       <button class="btn btn-primary" id="rhythmStartBtn" style="margin-top: 14px;">▶️ Start Game</button>
+      <button class="btn btn-outline" id="rhythmLeaderboardBtn" style="margin-top: 8px;">🏆 Leaderboard</button>
+
+      <div class="rhythm-leaderboard" id="rhythmLeaderboardPanel" style="display:none;">
+        <div class="lb-title">🏆 Top Scores</div>
+        <div id="rhythmLeaderboardList">Loading...</div>
+      </div>
     </div>
 
     <!-- 游戏进行中 -->
@@ -949,6 +980,7 @@ html, body {
       <div style="display: flex; gap: 10px; margin-top: 16px;">
         <button class="btn btn-outline" id="rhythmRetryBtn" style="flex:1;">🔄 Play Again</button>
         <button class="btn btn-primary" id="rhythmDownloadBtn" style="flex:1; display:none;">📥 Save Poster</button>
+        <button class="btn btn-outline" id="sharePosterBtn" style="flex:1; display:none;">📤 Share</button>
       </div>
     </div>
 
@@ -1026,7 +1058,10 @@ html, body {
       ⚠️ NOTICE: This boarding pass is a souvenir for PLLI. Official CSE venue entry requires showing your Gmail confirmation email and Reservation Name or Social Media ID.
     </div>
 
-    <button class="btn btn-coral" id="downloadBtn">Save / Download Ticket</button>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-coral" id="downloadBtn" style="flex:1;">Save / Download Ticket</button>
+      <button class="btn btn-outline" id="shareTicketBtn" style="flex:1;">📤 Share</button>
+    </div>
 
     <div class="social-row">
       <a class="btn btn-outline" href="https://x.com/MYPlliDduks" target="_blank">Twitter / X</a>
@@ -1073,6 +1108,88 @@ const PASSENGER_PHOTO_URL = "./plli.jpg";
     }, duration);
   };
 })();
+
+// 🎉 彩带庆祝特效（生日倒数归零时触发）
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    #confettiLayer {
+      position: fixed; inset: 0; z-index: 9998; pointer-events: none; overflow: hidden;
+    }
+    .confetti-piece {
+      position: absolute; top: -20px; opacity: 0.95; will-change: transform, top;
+      animation-name: confettiFall; animation-timing-function: ease-in;
+      animation-fill-mode: forwards;
+    }
+    @keyframes confettiFall {
+      0% { top: -20px; transform: translateX(0) rotate(0deg); opacity: 1; }
+      100% { top: 105vh; transform: translateX(var(--drift)) rotate(var(--spin)); opacity: 0.85; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  const colors = ['#E2B96F', '#F4D9A0', '#6FD6E0', '#FFFFFF', '#FF8F70'];
+
+  window.launchConfetti = function (durationMs = 4200, pieceCount = 90) {
+    let layer = document.getElementById('confettiLayer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = 'confettiLayer';
+      document.body.appendChild(layer);
+    }
+    for (let i = 0; i < pieceCount; i++) {
+      const el = document.createElement('div');
+      el.className = 'confetti-piece';
+      const size = 6 + Math.random() * 7;
+      const isCircle = Math.random() < 0.4;
+      el.style.width = size + 'px';
+      el.style.height = (isCircle ? size : size * 0.4) + 'px';
+      el.style.background = colors[Math.floor(Math.random() * colors.length)];
+      el.style.borderRadius = isCircle ? '50%' : '2px';
+      el.style.left = Math.random() * 100 + 'vw';
+      el.style.setProperty('--drift', (Math.random() * 160 - 80) + 'px');
+      el.style.setProperty('--spin', (Math.random() * 720 - 360) + 'deg');
+      const dur = 2.6 + Math.random() * 2.2;
+      el.style.animationDuration = dur + 's';
+      el.style.animationDelay = (Math.random() * 0.6) + 's';
+      layer.appendChild(el);
+      setTimeout(() => el.remove(), (dur + 1) * 1000);
+    }
+    setTimeout(() => { if (layer && !layer.hasChildNodes()) layer.remove(); }, durationMs + 1500);
+    (window.showToast || alert)('🎉 Happy Birthday, Nam Yejun! 🎂💙', 4000);
+  };
+})();
+
+// 📤 通用图片分享：支持的设备直接跳系统分享面板(IG/Twitter/etc)，不支持的就先下载图片再提示手动分享
+window.shareCanvasImage = function (canvas, filename, shareText) {
+  return new Promise((resolve) => {
+    canvas.toBlob(async (blob) => {
+      if (!blob) { resolve(false); return; }
+      const file = new File([blob], filename, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'Yejun Birthday Cafe', text: shareText });
+          resolve(true);
+          return;
+        } catch (err) {
+          // 用户取消分享，不算错误，直接结束
+          resolve(true);
+          return;
+        }
+      }
+      // 🌟 不支持系统分享面板（常见于桌面浏览器）：先帮忙下载图片，再提示手动分享
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = filename;
+      a.href = url;
+      a.click();
+      URL.revokeObjectURL(url);
+      (window.showToast || alert)('这台设备不支持直接跳转分享，已经帮你保存图片，去 IG/Twitter 手动分享吧！📸');
+      resolve(false);
+    }, 'image/png');
+  });
+};
+
 
 const pImg = document.getElementById('passengerImg');
 if (pImg) pImg.src = PASSENGER_PHOTO_URL;
@@ -1167,6 +1284,7 @@ window.switchTimer = function(type) {
   updateTimer();
 };
 
+let birthdayCelebrated = false;
 function updateTimer() {
   const now = new Date().getTime();
   const diff = currentTarget - now;
@@ -1176,6 +1294,11 @@ function updateTimer() {
     document.getElementById('dHours').textContent = '00';
     document.getElementById('dMins').textContent = '00';
     document.getElementById('dSecs').textContent = '00';
+    // 🎉 生日倒数归零那一刻，放一次彩带庆祝（只触发一次，不会每秒重复放）
+    if (!birthdayCelebrated && currentTarget === TARGET_BIRTHDAY) {
+      birthdayCelebrated = true;
+      if (typeof window.launchConfetti === 'function') window.launchConfetti();
+    }
     return;
   }
 
@@ -1362,6 +1485,35 @@ if (downloadBtn) {
   });
 }
 
+const shareTicketBtn = document.getElementById('shareTicketBtn');
+if (shareTicketBtn) {
+  const originalShareText = shareTicketBtn.textContent;
+  shareTicketBtn.addEventListener('click', async () => {
+    const card = document.getElementById('ticketCard');
+    if (!card) return;
+    if (typeof html2canvas === 'undefined') {
+      (window.showToast || alert)('图片生成组件加载失败，请检查网络后重新整理页面再试一次。');
+      return;
+    }
+    shareTicketBtn.disabled = true;
+    shareTicketBtn.style.opacity = '0.6';
+    shareTicketBtn.textContent = 'Preparing... ⏳';
+    try {
+      const canvas = await html2canvas(card, {
+        scale: 2, backgroundColor: '#FAF4E8', useCORS: true, logging: false, imageTimeout: 8000
+      });
+      await window.shareCanvasImage(canvas, 'Whisper_from_the_Deep_Blue_Ticket.png', "Yejun's birthday boarding pass 🎫🌊");
+    } catch (err) {
+      console.error('Ticket share failed:', err);
+      (window.showToast || alert)('分享失败，请检查图片路径！');
+    } finally {
+      shareTicketBtn.disabled = false;
+      shareTicketBtn.style.opacity = '1';
+      shareTicketBtn.textContent = originalShareText;
+    }
+  });
+}
+
 window.toggleMsgForm = function(action) {
   const formCard = document.getElementById('msgFormCard');
   const reopenBtn = document.getElementById('reopenFormBtn');
@@ -1433,6 +1585,7 @@ window.switchView = function(targetView) {
   const posterEl = document.getElementById('rhythmPoster');
   const posterNameEl = document.getElementById('posterName');
   const downloadPosterBtn = document.getElementById('rhythmDownloadBtn');
+  const sharePosterBtn = document.getElementById('sharePosterBtn');
 
   if (!stageEl) return; 
 
@@ -1760,6 +1913,18 @@ window.switchView = function(targetView) {
     accuracyEl.textContent = accuracy + '%';
     maxComboEl.textContent = String(maxCombo);
 
+    // 🏆 把这一局的成绩推送到排行榜
+    if (window.__fb) {
+      const nameEl = document.getElementById('pName');
+      const playerName = (nameEl && nameEl.textContent && nameEl.textContent !== 'GUEST') ? nameEl.textContent : 'PLLI';
+      window.__fb.push(window.__fb.leaderboardRef, {
+        name: playerName,
+        score, accuracy, maxCombo, rank,
+        song: RHYTHM_SONGS[selectedSongIndex].title,
+        timestamp: Date.now()
+      }).catch(() => {});
+    }
+
     if (rank === 'S') {
       const nameFromTicket = document.getElementById('pName');
       posterNameEl.textContent = (nameFromTicket && nameFromTicket.textContent && nameFromTicket.textContent !== 'GUEST')
@@ -1776,9 +1941,11 @@ window.switchView = function(targetView) {
 
       posterEl.style.display = 'block';
       downloadPosterBtn.style.display = 'inline-flex';
+      if (sharePosterBtn) sharePosterBtn.style.display = 'inline-flex';
     } else {
       posterEl.style.display = 'none';
       downloadPosterBtn.style.display = 'none';
+      if (sharePosterBtn) sharePosterBtn.style.display = 'none';
     }
 
     if (typeof wavesAudio !== 'undefined' && wavesAudio && wasWavesPlaying) wavesAudio.play().catch(() => {});
@@ -1799,6 +1966,42 @@ window.switchView = function(targetView) {
 
   if (startBtn) startBtn.addEventListener('click', startGame);
   if (retryBtn) retryBtn.addEventListener('click', startGame);
+
+  // 🏆 排行榜：点按钮展开/收起，展开时用 Firebase 实时数据渲染前 5 名
+  const lbBtn = document.getElementById('rhythmLeaderboardBtn');
+  const lbPanel = document.getElementById('rhythmLeaderboardPanel');
+  const lbList = document.getElementById('rhythmLeaderboardList');
+  let lbSubscribed = false;
+
+  function renderLeaderboard(data) {
+    if (!lbList) return;
+    if (!data) { lbList.innerHTML = '<div class="lb-empty">还没有人上榜，快来当第一名！</div>'; return; }
+    const entries = Object.values(data)
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, 5);
+    lbList.innerHTML = entries.map((e, i) => `
+      <div class="lb-entry">
+        <div class="lb-rank">${i + 1}</div>
+        <div class="lb-name">${escapeHtml(e.name || 'PLLI')} · ${escapeHtml(e.song || '')}</div>
+        <div class="lb-score">${e.score || 0}</div>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  if (lbBtn) {
+    lbBtn.addEventListener('click', () => {
+      const showing = lbPanel.style.display === 'block';
+      lbPanel.style.display = showing ? 'none' : 'block';
+      if (!showing && !lbSubscribed && window.__fb) {
+        lbSubscribed = true;
+        window.__fb.onValue(window.__fb.leaderboardRef, (snap) => renderLeaderboard(snap.val()));
+      }
+    });
+  }
 
   const KEY_LANE_MAP = { d: 0, f: 1, j: 2, k: 3 };
   window.addEventListener('keydown', (e) => {
@@ -1838,6 +2041,30 @@ window.switchView = function(targetView) {
         downloadPosterBtn.disabled = false;
         downloadPosterBtn.style.opacity = '1';
         downloadPosterBtn.textContent = originalText;
+      }
+    });
+  }
+
+  if (sharePosterBtn) {
+    const originalShareText = sharePosterBtn.textContent;
+    sharePosterBtn.addEventListener('click', async () => {
+      if (typeof html2canvas === 'undefined') {
+        (window.showToast || alert)('图片生成组件加载失败，请检查网络后重新整理页面再试一次。');
+        return;
+      }
+      sharePosterBtn.disabled = true;
+      sharePosterBtn.style.opacity = '0.6';
+      sharePosterBtn.textContent = 'Preparing... ⏳';
+      try {
+        const canvas = await html2canvas(posterEl, { scale: 2, useCORS: true, logging: false });
+        await window.shareCanvasImage(canvas, 'Deep_Sea_Chief_Musician.png', 'I hit S rank on Rhythm Ocean Beat! 🎻🌊');
+      } catch (err) {
+        console.error('Poster share failed:', err);
+        (window.showToast || alert)('分享失败，请检查图片路径！');
+      } finally {
+        sharePosterBtn.disabled = false;
+        sharePosterBtn.style.opacity = '1';
+        sharePosterBtn.textContent = originalShareText;
       }
     });
   }
