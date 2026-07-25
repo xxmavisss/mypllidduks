@@ -1532,17 +1532,20 @@ window.toggleMsgForm = function(action) {
   const formCard = document.getElementById('msgFormCard');
   const reopenBtn = document.getElementById('reopenFormBtn');
   const subtitleEl = document.getElementById('msgSubtitle');
+  const countEl = document.getElementById('msgCount');
   
   if (action === 'hide') {
     formCard.style.display = 'none';
     reopenBtn.style.display = 'inline-flex';
-    // 🌟 X 掉留言表单后，副标题换成生日祝福
+    // 🌟 X 掉留言表单后，副标题换成生日祝福，留言总数也一起隐藏
     if (subtitleEl) subtitleEl.textContent = 'Happy Birthday, Nam Yejun!💙';
+    if (countEl) countEl.style.display = 'none';
   } else {
     formCard.style.display = 'block';
     reopenBtn.style.display = 'none';
-    // 🌟 打开留言表单时，副标题换回选择留言方式的引导文案
+    // 🌟 打开留言表单时，副标题换回选择留言方式的引导文案，留言总数也重新显示
     if (subtitleEl) subtitleEl.textContent = 'Choose your ocean companion and send your wishes into the deep blue.💙';
+    if (countEl) countEl.style.display = 'block';
   }
 };
 
