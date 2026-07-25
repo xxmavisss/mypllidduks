@@ -692,6 +692,19 @@ html, body {
   font-family: 'Cinzel', serif; font-size: 56px; font-weight: 800; color: var(--gold-bright);
   text-shadow: 0 4px 20px rgba(226,185,111,0.5); line-height: 1;
 }
+.hs-prompt {
+  margin-top: 12px; padding: 12px; border-radius: 14px;
+  background: rgba(226,185,111,0.12); border: 1px solid var(--gold-bright);
+}
+.hs-prompt-title {
+  font-size: 12.5px; font-weight: 700; color: var(--gold-bright); text-align: center;
+}
+.hs-prompt input {
+  flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.08); color: #fff; font-size: 13px; outline: none;
+}
+.hs-prompt input::placeholder { color: rgba(255,255,255,0.5); }
+
 .rhythm-poster {
   width: 100%; max-width: 320px; margin: 16px auto 0; border-radius: 16px; overflow: hidden;
   background: linear-gradient(160deg, #0A192F, #16344B 60%, #0A192F);
@@ -977,6 +990,15 @@ html, body {
       <div class="rhythm-rank" id="rhythmRank">B</div>
       <div style="font-size:13px; margin-top:8px; color:#fff;">
         Score <b id="rhythmFinalScore">0</b> · Accuracy <b id="rhythmAccuracy">0%</b> · Max Combo <b id="rhythmMaxCombo">0</b>
+      </div>
+
+      <!-- 🏆 只有成绩进前 5 名才会出现，问玩家要名字 -->
+      <div class="hs-prompt" id="hsPrompt" style="display:none;">
+        <div class="hs-prompt-title">🎉 New High Score! Top 5 leaderboard!</div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <input type="text" id="hsNameInput" placeholder="Your name / PLLI nickname" maxlength="20" />
+          <button class="btn btn-primary" id="hsSubmitBtn" style="width:auto; padding:0 16px;">Submit</button>
+        </div>
       </div>
 
       <!-- S 级专属海报 -->
@@ -1636,6 +1658,7 @@ window.switchView = function(targetView) {
   let rafId = null;
   let gameActive = false;
   let score = 0, combo = 0, maxCombo = 0, hits = 0, life = 5;
+  let pendingHighScore = null;
   let wasWavesPlaying = false, wasBgmPlaying = false;
   let currentSongDuration = 180;
 
@@ -1866,6 +1889,9 @@ window.switchView = function(targetView) {
   async function startGame() {
     introEl.style.display = 'none';
     resultEl.style.display = 'none';
+    const hsPromptReset = document.getElementById('hsPrompt');
+    if (hsPromptReset) hsPromptReset.style.display = 'none';
+    pendingHighScore = null;
     playAreaEl.style.display = 'block';
     startBtn.disabled = true;
     startBtn.textContent = 'Loading full song... 🎼';
@@ -1930,16 +1956,16 @@ window.switchView = function(targetView) {
     accuracyEl.textContent = accuracy + '%';
     maxComboEl.textContent = String(maxCombo);
 
-    // 🏆 把这一局的成绩推送到排行榜
-    if (window.__fb) {
-      const nameEl = document.getElementById('pName');
-      const playerName = (nameEl && nameEl.textContent && nameEl.textContent !== 'GUEST') ? nameEl.textContent : 'PLLI';
-      window.__fb.push(window.__fb.leaderboardRef, {
-        name: playerName,
-        score, accuracy, maxCombo, rank,
-        song: RHYTHM_SONGS[selectedSongIndex].title,
-        timestamp: Date.now()
-      }).catch(() => {});
+    // 🏆 只有这局成绩够格进前 5 名，才跳出来问名字；不够格就不问也不存
+    const hsPrompt = document.getElementById('hsPrompt');
+    if (hsPrompt) {
+      if (window.__fb && qualifiesForTop5(score)) {
+        hsPrompt.style.display = 'block';
+        pendingHighScore = { score, accuracy, maxCombo, rank, song: RHYTHM_SONGS[selectedSongIndex].title };
+      } else {
+        hsPrompt.style.display = 'none';
+        pendingHighScore = null;
+      }
     }
 
     if (rank === 'S') {
@@ -1984,15 +2010,16 @@ window.switchView = function(targetView) {
   if (startBtn) startBtn.addEventListener('click', startGame);
   if (retryBtn) retryBtn.addEventListener('click', startGame);
 
-  // 🏆 排行榜：点按钮展开/收起，展开时用 Firebase 实时数据渲染前 5 名
+  // 🏆 排行榜：一进游戏就订阅 Firebase 实时数据并缓存起来，
+  // 这样结算时可以立刻知道这局成绩有没有进前 5 名，不用等用户点开排行榜面板
   const lbBtn = document.getElementById('rhythmLeaderboardBtn');
   const lbPanel = document.getElementById('rhythmLeaderboardPanel');
   const lbList = document.getElementById('rhythmLeaderboardList');
-  let lbSubscribed = false;
+  let latestLeaderboard = null;
 
   function renderLeaderboard(data) {
     if (!lbList) return;
-    if (!data) { lbList.innerHTML = '<div class="lb-empty">还没有人上榜，快来当第一名！</div>'; return; }
+    if (!data) { lbList.innerHTML = '<div class="lb-empty">No one's on the leaderboard yet—be the first!</div>'; return; }
     const entries = Object.values(data)
       .sort((a, b) => (b.score || 0) - (a.score || 0))
       .slice(0, 5);
@@ -2009,14 +2036,54 @@ window.switchView = function(targetView) {
     return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
+  // 🌟 是否够格进前 5 名（不足 5 条记录时，任何分数都算够格）
+  function qualifiesForTop5(newScore) {
+    const data = latestLeaderboard;
+    if (!data) return true;
+    const scores = Object.values(data).map(e => e.score || 0).sort((a, b) => b - a);
+    if (scores.length < 5) return true;
+    return newScore > scores[4];
+  }
+
+  if (window.__fb) {
+    window.__fb.onValue(window.__fb.leaderboardRef, (snap) => {
+      latestLeaderboard = snap.val();
+      renderLeaderboard(latestLeaderboard);
+    });
+  }
+
   if (lbBtn) {
     lbBtn.addEventListener('click', () => {
       const showing = lbPanel.style.display === 'block';
       lbPanel.style.display = showing ? 'none' : 'block';
-      if (!showing && !lbSubscribed && window.__fb) {
-        lbSubscribed = true;
-        window.__fb.onValue(window.__fb.leaderboardRef, (snap) => renderLeaderboard(snap.val()));
+      if (!showing && window.__fb) {
+        renderLeaderboard(latestLeaderboard);
       }
+    });
+  }
+
+  // 🏆 提交高分记录：把玩家刚刚输入的名字连同这局成绩一起存进排行榜
+  const hsSubmitBtn = document.getElementById('hsSubmitBtn');
+  const hsNameInput = document.getElementById('hsNameInput');
+  if (hsSubmitBtn) {
+    hsSubmitBtn.addEventListener('click', () => {
+      if (!pendingHighScore || !window.__fb) return;
+      const name = (hsNameInput && hsNameInput.value.trim()) ? hsNameInput.value.trim() : 'PLLI';
+      hsSubmitBtn.disabled = true;
+      window.__fb.push(window.__fb.leaderboardRef, {
+        ...pendingHighScore,
+        name,
+        timestamp: Date.now()
+      }).then(() => {
+        (window.showToast || alert)('🏆 已经上榜啦！');
+        const hsPrompt = document.getElementById('hsPrompt');
+        if (hsPrompt) hsPrompt.style.display = 'none';
+        pendingHighScore = null;
+      }).catch(() => {
+        (window.showToast || alert)('上传排行榜失败，请检查网络！');
+      }).finally(() => {
+        hsSubmitBtn.disabled = false;
+      });
     });
   }
 
