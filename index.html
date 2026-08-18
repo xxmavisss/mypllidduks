@@ -395,6 +395,25 @@ html, body {
   box-shadow: 0 8px 20px rgba(0,0,0,0.3); pointer-events: none;
 }
 
+/* 🎁 Freebies Preview 展示影片 */
+.freebies-preview {
+  max-width: 500px; margin: 40px auto 0; padding: 0 20px; text-align: center;
+  position: relative; z-index: 20;
+}
+.freebies-title {
+  font-family: 'Cinzel', serif; color: var(--gold-bright); font-size: 18px;
+  margin-bottom: 14px; letter-spacing: 1px;
+}
+.freebies-video-frame {
+  border-radius: 16px; overflow: hidden; border: 1px solid var(--glass-border);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.45); background: #000;
+}
+.freebies-video-frame video { width: 100%; display: block; }
+.freebies-caption {
+  font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.5;
+  margin-top: 12px; padding: 0 8px;
+}
+
 /* ✉️ 留言板页面专用样式 */
 .message-view-container {
   position: relative; z-index: 20; max-width: 520px; margin: 0 auto;
@@ -887,6 +906,14 @@ html, body {
       </div>
       <div class="bottle-hint">Click the drift bottle to unlock your message</div>
     </div>
+  </div>
+
+  <div class="freebies-preview">
+    <h3 class="freebies-title">Freebies & Donation Kit Artwork</h3>
+    <div class="freebies-video-frame">
+      <video src="./carousel-flow.mp4" autoplay loop muted playsinline controls></video>
+    </div>
+    <div class="freebies-caption">A huge thank you to our collab artists for creating such beautiful artwork for Whisper from the Deep Blue! 🌊💙</div>
   </div>
 </div>
 
