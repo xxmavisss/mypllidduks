@@ -837,9 +837,9 @@ html, body {
   </div>
 
   <div class="nav-actions-right">
-<button class="nav-btn" style="cursor: default; opacity: 0.7;" disabled>
+<a class="nav-btn" id="specialLink" style="cursor: default; opacity: 0.7; pointer-events: none;">
   ⏳ <span>Something special coming soon</span>
-</button>
+</a>
     
     <div class="audio-panel">
       <div class="audio-row" id="bgmRow">
@@ -909,11 +909,11 @@ html, body {
   </div>
 
   <div class="freebies-preview">
-    <h3 class="freebies-title">Freebies & Donation Kit Artwork</h3>
+    <h3 class="freebies-title">🎁 Freebies & Donation Kit Artwork</h3>
     <div class="freebies-video-frame">
       <video src="./carousel-flow.mp4" autoplay loop muted playsinline controls></video>
     </div>
-    <div class="freebies-caption">A huge thank you to our collab artists for creating such beautiful artwork for Whisper from the Deep Blue! 🌊💙</div>
+    <div class="freebies-caption">A huge thank you to our collab artists for creating such beautiful artwork for Whisper from the Deep Blue! 🌊🤍</div>
   </div>
 </div>
 
@@ -1366,9 +1366,27 @@ window.switchTimer = function(type) {
 };
 
 let birthdayCelebrated = false;
+let specialLinkActivated = false;
+
+function activateSpecialLink() {
+  if (specialLinkActivated) return;
+  specialLinkActivated = true;
+  const link = document.getElementById('specialLink');
+  if (!link) return;
+  link.href = 'https://asterumphotobooth.vercel.app/';
+  link.target = '_blank';
+  link.style.cursor = 'pointer';
+  link.style.opacity = '1';
+  link.style.pointerEvents = 'auto';
+  link.innerHTML = '🐬 <span>Asterum Photo Booth — Yejun\u2019s Frame is Out! 🐬</span>';
+}
+
 function updateTimer() {
   const now = new Date().getTime();
   const diff = currentTarget - now;
+
+  // 🌟 不管现在切换到哪个倒数标签，只要真实时间已经过了生日，就把连结换成正式版
+  if (Date.now() >= TARGET_BIRTHDAY) activateSpecialLink();
 
   if (diff <= 0) {
     document.getElementById('dDays').textContent = '00';
@@ -1447,7 +1465,7 @@ function swimDolphin() {
 swimDolphin();
 
 const dolphinInner = document.getElementById('dolphinInner');
-const msgs = ["HAPPY YEJUN DAY! 🎂", "Welcome to Asterum!🌊", "NAM YEJUN!💙", "PLLI ❤️ YEJUN"];
+const msgs = ["HAPPY YEJUN DAY! 🎂", "Welcome to !🌊", "NAM YEJUN!💙", "PLLI ❤️ YEJUN"];
 if (dolphin) {
   dolphin.addEventListener('click', (e) => {
     e.stopPropagation();
