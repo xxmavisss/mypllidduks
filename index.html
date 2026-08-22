@@ -395,20 +395,64 @@ html, body {
   box-shadow: 0 8px 20px rgba(0,0,0,0.3); pointer-events: none;
 }
 
-/* 🎁 Freebies Preview 展示影片 */
+/* 🎁 Freebies Preview · CSS artwork carousel */
 .freebies-preview {
-  max-width: 500px; margin: 40px auto 0; padding: 0 20px; text-align: center;
+  max-width: 620px; margin: 40px auto 0; padding: 0 20px; text-align: center;
   position: relative; z-index: 20;
 }
 .freebies-title {
   font-family: 'Cinzel', serif; color: var(--gold-bright); font-size: 18px;
   margin-bottom: 14px; letter-spacing: 1px;
 }
-.freebies-video-frame {
-  border-radius: 16px; overflow: hidden; border: 1px solid var(--glass-border);
-  box-shadow: 0 20px 50px rgba(0,0,0,0.45); background: #000;
+.artwork-carousel {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  background: rgba(4, 15, 29, 0.62);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+  padding: 16px 0;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  cursor: grab;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
 }
-.freebies-video-frame video { width: 100%; display: block; }
+.artwork-carousel::-webkit-scrollbar { display: none; }
+.artwork-carousel:active { cursor: grabbing; }
+.artwork-track {
+  display: flex;
+  width: max-content;
+  padding: 0 18px;
+}
+.artwork-set { display: flex; gap: 14px; }
+.artwork-card {
+  width: 210px;
+  height: 154px;
+  flex: 0 0 auto;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  box-shadow: 0 9px 22px rgba(0,0,0,0.28);
+  transform: translateZ(0);
+  scroll-snap-align: start;
+}
+.artwork-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+.artwork-card:hover img { transform: scale(1.06); }
+@media (max-width: 600px) {
+  .artwork-card { width: 172px; height: 126px; }
+  .artwork-track { padding: 0 12px; }
+  .artwork-set { gap: 10px; }
+}
 .freebies-caption {
   font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.5;
   margin-top: 12px; padding: 0 8px;
@@ -947,8 +991,18 @@ html, body {
 
   <div class="freebies-preview">
     <h3 class="freebies-title">Freebies & Donation Kit Artwork</h3>
-    <div class="freebies-video-frame">
-      <video src="./carousel-flow.mp4" autoplay loop muted playsinline controls></video>
+    <div class="artwork-carousel" aria-label="Freebies and donation kit artwork carousel">
+      <div class="artwork-track" role="group" aria-label="Swipe left or right to view artwork">
+        <div class="artwork-set">
+          <figure class="artwork-card"><img src="./artist work/Donation kit - Foldable Fan.png" alt="Donation kit foldable fan artwork"></figure>
+          <figure class="artwork-card"><img src="./artist work/Freebies preview Paperbag.png" alt="Freebies paper bag artwork"></figure>
+          <figure class="artwork-card"><img src="./artist work/Freebies preview - sticker sheet.png" alt="Freebies sticker sheet artwork"></figure>
+          <figure class="artwork-card"><img src="./artist work/Donation kit - Ripple Keychain.png" alt="Donation kit ripple keychain artwork"></figure>
+          <figure class="artwork-card"><img src="./artist work/Donation kit - Acrylic Mirror Keyring.png" alt="Donation kit acrylic mirror keyring artwork"></figure>
+          <figure class="artwork-card"><img src="./artist work/Freebies preview Cupsleeve.png" alt="Freebies cupsleeve artwork"></figure>
+          <figure class="artwork-card"><img src="./artist work/Donation kit - Water-sensitive Postcard & Lenticular Card.png" alt="Donation kit postcard and lenticular card artwork"></figure>
+        </div>
+      </div>
     </div>
     <div class="freebies-caption">A huge thank you to our collab artists for creating such beautiful artwork for Whisper from the Deep Blue! 🌊🤍</div>
   </div>
