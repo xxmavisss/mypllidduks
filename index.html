@@ -771,7 +771,7 @@ html, body {
 .rhythm-touch-btn {
   flex: 1; padding: 14px 0; border-radius: 12px; border: 1px solid rgba(255,255,255,0.25);
   background: rgba(255,255,255,0.08); color: #fff; font-weight: 700; font-size: 13px; cursor: pointer;
-  user-select: none; -webkit-user-select: none;
+  user-select: none; -webkit-user-select: none; touch-action: manipulation;
 }
 .rhythm-touch-btn:active { background: rgba(255,255,255,0.25); }
 
@@ -1413,6 +1413,8 @@ document.addEventListener('click', resumeBgVideo, { passive: true });
 const canvas = document.getElementById('trailCanvas');
 const ctx = canvas.getContext('2d');
 let particles = [];
+let trailAnimationId = null;
+let trailPaused = false;
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
@@ -1447,6 +1449,7 @@ class Particle {
 }
 
 function handlePointer(x, y) {
+  if (trailPaused) return;
   for (let i = 0; i < 2; i++) {
     particles.push(new Particle(x, y));
   }
@@ -1457,6 +1460,7 @@ window.addEventListener('touchmove', (e) => {
 });
 
 function animateParticles() {
+  if (trailPaused) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   for (let i = 0; i < particles.length; i++) {
     particles[i].update();
@@ -1466,9 +1470,20 @@ function animateParticles() {
       i--;
     }
   }
-  requestAnimationFrame(animateParticles);
+  trailAnimationId = requestAnimationFrame(animateParticles);
 }
-animateParticles();
+trailAnimationId = requestAnimationFrame(animateParticles);
+window.setTrailPaused = function (paused) {
+  trailPaused = paused;
+  if (paused) {
+    particles = [];
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (trailAnimationId) cancelAnimationFrame(trailAnimationId);
+    trailAnimationId = null;
+  } else if (!trailAnimationId) {
+    trailAnimationId = requestAnimationFrame(animateParticles);
+  }
+};
 
 const TARGET_BIRTHDAY = new Date('2026-09-11T23:00:00+08:00').getTime();
 const TARGET_EVENT = new Date('2026-09-19T11:00:00+08:00').getTime();
@@ -1754,7 +1769,9 @@ window.switchView = function(targetView) {
 
 (function () {
   const LEAD_TIME = 2.3;
-  const HIT_WINDOW = 0.24;
+  const PERFECT_WINDOW = 0.10;
+  const GOOD_WINDOW = 0.22;
+  const HIT_WINDOW = 0.32;
   const LANES = 4;
   const NOTE_TYPES = ['note-normal', 'note-bottle', 'note-star'];
 
@@ -1990,13 +2007,31 @@ window.switchView = function(targetView) {
     }
     flashLane(laneIndex);
     if (candidate) {
+      const timingError = Math.abs(candidate.time - t);
       candidate.judged = true;
       if (candidate.el) candidate.el.classList.add('judged');
       hits++; combo++; maxCombo = Math.max(maxCombo, combo);
-      score += 100 + Math.min(combo, 30) * 3;
-      showJudge(combo >= 15 ? 'PERFECT!' : 'HIT!');
+      if (timingError <= PERFECT_WINDOW) {
+        score += 150 + Math.min(combo, 30) * 4;
+        showJudge('PERFECT!');
+      } else if (timingError <= GOOD_WINDOW) {
+        score += 100 + Math.min(combo, 30) * 3;
+        showJudge('GOOD!');
+      } else {
+        score += 60 + Math.min(combo, 30) * 2;
+        showJudge('OK!');
+      }
       updateHud();
+    } else {
+      missInput();
     }
+  }
+
+  function missInput() {
+    combo = 0; life--;
+    showJudge('MISS');
+    updateHud();
+    if (life <= 0) endGame();
   }
 
   function missNote(note) {
@@ -2074,11 +2109,13 @@ window.switchView = function(targetView) {
     startBtn.textContent = '▶️ Start Game';
 
     gameActive = true;
+    if (typeof window.setTrailPaused === 'function') window.setTrailPaused(true);
     try {
       await rhythmAudio.play();
     } catch (err) {
       (window.showToast || alert)('Audio playback failed. Please check your network or the audio file!');
       gameActive = false;
+      if (typeof window.setTrailPaused === 'function') window.setTrailPaused(false);
       playAreaEl.style.display = 'none';
       introEl.style.display = 'block';
       return;
@@ -2142,6 +2179,7 @@ window.switchView = function(targetView) {
 
     if (typeof wavesAudio !== 'undefined' && wavesAudio && wasWavesPlaying) wavesAudio.play().catch(() => {});
     if (typeof bgmAudio !== 'undefined' && bgmAudio && wasBgmPlaying) bgmAudio.play().catch(() => {});
+    if (typeof window.setTrailPaused === 'function') window.setTrailPaused(false);
   }
 
   window.stopRhythmGame = function () {
@@ -2154,6 +2192,7 @@ window.switchView = function(targetView) {
     introEl.style.display = 'block';
     if (typeof wavesAudio !== 'undefined' && wavesAudio && wasWavesPlaying) wavesAudio.play().catch(() => {});
     if (typeof bgmAudio !== 'undefined' && bgmAudio && wasBgmPlaying) bgmAudio.play().catch(() => {});
+    if (typeof window.setTrailPaused === 'function') window.setTrailPaused(false);
   };
 
   if (startBtn) startBtn.addEventListener('click', startGame);
@@ -2254,16 +2293,22 @@ window.switchView = function(targetView) {
   const KEY_LANE_MAP = { d: 0, f: 1, j: 2, k: 3 };
   window.addEventListener('keydown', (e) => {
     if (!gameActive) return;
+    if (e.repeat) return;
     const lane = KEY_LANE_MAP[e.key.toLowerCase()];
     if (lane !== undefined) judgeHit(lane);
   });
 
   document.querySelectorAll('.rhythm-touch-btn').forEach((btn) => {
-    btn.addEventListener('touchstart', (e) => {
+    const hitLane = (e) => {
       e.preventDefault();
       judgeHit(Number(btn.dataset.lane));
-    }, { passive: false });
-    btn.addEventListener('click', () => judgeHit(Number(btn.dataset.lane)));
+    };
+    if (window.PointerEvent) {
+      btn.addEventListener('pointerdown', hitLane, { passive: false });
+    } else {
+      btn.addEventListener('touchstart', hitLane, { passive: false });
+      btn.addEventListener('click', () => judgeHit(Number(btn.dataset.lane)));
+    }
   });
 
   if (sharePosterBtn) {
