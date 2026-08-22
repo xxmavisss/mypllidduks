@@ -406,27 +406,20 @@ html, body {
 }
 .artwork-carousel {
   position: relative;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
   border: 1px solid var(--glass-border);
   border-radius: 18px;
   background: rgba(4, 15, 29, 0.62);
   box-shadow: 0 20px 50px rgba(0,0,0,0.45);
   padding: 16px 0;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  cursor: grab;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
 }
-.artwork-carousel::-webkit-scrollbar { display: none; }
-.artwork-carousel:active { cursor: grabbing; }
 .artwork-track {
   display: flex;
   width: max-content;
-  padding: 0 18px;
+  animation: artworkDrift 34s linear infinite;
 }
 .artwork-set { display: flex; gap: 14px; }
+.artwork-carousel:hover .artwork-track { animation-play-state: paused; }
 .artwork-card {
   width: 210px;
   height: 154px;
@@ -438,7 +431,6 @@ html, body {
   background: rgba(255,255,255,0.08);
   box-shadow: 0 9px 22px rgba(0,0,0,0.28);
   transform: translateZ(0);
-  scroll-snap-align: start;
 }
 .artwork-card img {
   display: block;
@@ -448,10 +440,15 @@ html, body {
   transition: transform 0.4s ease;
 }
 .artwork-card:hover img { transform: scale(1.06); }
+@keyframes artworkDrift {
+  to { transform: translateX(-50%); }
+}
 @media (max-width: 600px) {
   .artwork-card { width: 172px; height: 126px; }
-  .artwork-track { padding: 0 12px; }
   .artwork-set { gap: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .artwork-track { animation-play-state: paused; }
 }
 .freebies-caption {
   font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.5;
@@ -992,7 +989,7 @@ html, body {
   <div class="freebies-preview">
     <h3 class="freebies-title">Freebies & Donation Kit Artwork</h3>
     <div class="artwork-carousel" aria-label="Freebies and donation kit artwork carousel">
-      <div class="artwork-track" role="group" aria-label="Swipe left or right to view artwork">
+      <div class="artwork-track">
         <div class="artwork-set">
           <figure class="artwork-card"><img src="./artist work/Donation kit - Foldable Fan.png" alt="Donation kit foldable fan artwork"></figure>
           <figure class="artwork-card"><img src="./artist work/Freebies preview Paperbag.png" alt="Freebies paper bag artwork"></figure>
@@ -1001,6 +998,15 @@ html, body {
           <figure class="artwork-card"><img src="./artist work/Donation kit - Acrylic Mirror Keyring.png" alt="Donation kit acrylic mirror keyring artwork"></figure>
           <figure class="artwork-card"><img src="./artist work/Freebies preview Cupsleeve.png" alt="Freebies cupsleeve artwork"></figure>
           <figure class="artwork-card"><img src="./artist work/Donation kit - Water-sensitive Postcard & Lenticular Card.png" alt="Donation kit postcard and lenticular card artwork"></figure>
+        </div>
+        <div class="artwork-set" aria-hidden="true">
+          <figure class="artwork-card"><img src="./artist work/Donation kit - Foldable Fan.png" alt=""></figure>
+          <figure class="artwork-card"><img src="./artist work/Freebies preview Paperbag.png" alt=""></figure>
+          <figure class="artwork-card"><img src="./artist work/Freebies preview - sticker sheet.png" alt=""></figure>
+          <figure class="artwork-card"><img src="./artist work/Donation kit - Ripple Keychain.png" alt=""></figure>
+          <figure class="artwork-card"><img src="./artist work/Donation kit - Acrylic Mirror Keyring.png" alt=""></figure>
+          <figure class="artwork-card"><img src="./artist work/Freebies preview Cupsleeve.png" alt=""></figure>
+          <figure class="artwork-card"><img src="./artist work/Donation kit - Water-sensitive Postcard & Lenticular Card.png" alt=""></figure>
         </div>
       </div>
     </div>
